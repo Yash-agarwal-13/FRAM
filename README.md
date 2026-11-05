@@ -1,72 +1,79 @@
-# FRAM Biocon
+# Financial Risk Analytics and Management (FRAM)
+## Credit Risk Modelling — Biocon Limited
 
-Financial Risk Analytics and Management project for Biocon Limited. The project prepares market and financial inputs for GARCH, Black-Scholes, Merton structural credit-risk, Altman Z-score, and machine-learning analysis.
+### Project Overview
 
-## Current status
+This repository contains the Python implementation and Jupyter notebooks developed for the Financial Risk Analytics and Management (FRAM) course assignment.
 
-Market-input preprocessing is complete for the supplied Biocon equity history and RBI Treasury-bill auction files. The script validates the data, selects fiscal-year-end and assignment valuation-date observations, converts published yields to model rates, saves clean CSV files, and prints compact review tables.
+**Company:** Biocon Limited  
+**Programming Language:** Python 3.12  
+**Development Environment:** Visual Studio Code  
+**Version Control:** Git and GitHub  
+**Final Deliverable:** Consolidated Jupyter Notebook (`.ipynb`), executable in Google Colab
 
-## Project structure
+### Project Objectives
+
+The project aims to apply quantitative financial risk modelling techniques to Biocon Limited, including:
+
+- Black-Scholes-Merton (BSM) framework
+- Merton structural credit risk model
+- GARCH volatility modelling
+- Machine learning techniques for financial risk analysis
+- Model evaluation, interpretation and comparison
+
+The detailed implementation and evaluation methodology will follow the course assignment requirements.
+
+### Project Structure
 
 ```text
-data/
-  raw/
-    equity/       Biocon adjusted daily prices
-    financials/   FY2022-FY2026 financial statements
-    options/      NSE option-chain data
-    rates/        RBI 91-day and 364-day T-bill auctions
-  processed/      Generated clean CSV files
-src/
-  preprocess_market_inputs.py
-notebooks/
-outputs/
-final/
+FRAM_BIOCON/
+├── data/               # Input datasets
+├── src/                # Python source code
+├── notebooks/          # Independent Jupyter notebooks
+├── outputs/            # Generated figures and results
+├── final/              # Final consolidated notebook
+├── .gitignore          # Git exclusions
+├── README.md           # Project documentation
+└── requirements.txt    # Python dependencies
 ```
 
-Raw workbooks and generated data are kept locally and are not committed to GitHub.
+### Development Workflow
 
-## Setup
+The project follows a modular development approach:
 
-Create and activate a virtual environment, then install the dependencies:
+1. Develop and test individual models independently.
+2. Track changes using Git feature branches.
+3. Merge validated work into the `develop` branch.
+4. Integrate and test the complete workflow.
+5. Merge the validated version into `main`.
+6. Prepare the final Jupyter notebook for Google Colab.
+
+### Environment Setup
+
+Create a Python virtual environment:
 
 ```powershell
-pip install -r requirements.txt
+py -m venv .venv
 ```
 
-## Run market-input preprocessing
-
-From the project root:
+Activate it in Windows PowerShell:
 
 ```powershell
-python src/preprocess_market_inputs.py
+.\.venv\Scripts\Activate.ps1
 ```
 
-The script reads:
+Install dependencies:
 
-- `data/raw/equity/Biocon_data.xlsx`
-- `data/raw/rates/Auctions of 91-Day Government of India Treasury Bills.xlsx`
-- `data/raw/rates/Auctions of 364-Day Government of India Treasury Bills.xlsx`
+```powershell
+python -m pip install -r requirements.txt
+```
 
-It creates:
+### Project Status
 
-- `data/processed/biocon_equity_adjusted.csv`
-- `data/processed/fiscal_year_end_equity_prices.csv`
-- `data/processed/valuation_date_equity_prices.csv`
-- `data/processed/rbi_tbill_auction_yields.csv`
-- `data/processed/valuation_date_tbill_rates.csv`
+**Current phase:** Development environment and repository setup.
 
-The terminal also displays fiscal-year-end equity prices, the 12 assignment valuation-date prices, and the matching 91-day and 364-day T-bill rates.
+Financial modelling and analysis are pending implementation.
 
-## Modeling conventions
+### Academic Use
 
-- Preserve the user-supplied adjusted equity prices and returns.
-- Use the latest RBI auction yield available by each valuation cutoff.
-- Convert the published percentage yield with `R / 100`, then calculate the continuous rate as `ln(1 + R)`.
-- Use fiscal years ending 31 March for the Altman Z-score inputs.
-
-## Next steps
-
-- Preprocess NSE option contracts and document exclusions.
-- Collect dated shares outstanding and borrowings for Merton analysis.
-- Build GARCH, BSM, Merton, Altman Z-score, and ML notebooks.
-- Produce the final report and supporting outputs.
+Developed as part of a university course assignment. Results will be based on the specified financial data and modelling assumptions and should not be interpreted as investment recommendations.python -m pip install --upgrade pip
