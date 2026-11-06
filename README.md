@@ -1,29 +1,12 @@
-# Financial Risk Analytics and Management (FRAM)
-## Credit Risk Modelling — Biocon Limited
+# FRAM Biocon
 
-### Project Overview
+Financial Risk Analytics and Management project for Biocon Limited. The project prepares market and financial inputs for GARCH, Black-Scholes, Merton structural credit-risk, Altman Z-score, and machine-learning analysis.
 
-This repository contains the Python implementation and Jupyter notebooks developed for the Financial Risk Analytics and Management (FRAM) course assignment.
+## Current status
 
-**Company:** Biocon Limited  
-**Programming Language:** Python 3.12  
-**Development Environment:** Visual Studio Code  
-**Version Control:** Git and GitHub  
-**Final Deliverable:** Consolidated Jupyter Notebook (`.ipynb`), executable in Google Colab
+Market-input preprocessing is complete for the supplied Biocon equity history and RBI Treasury-bill auction files. The script validates the data, selects fiscal-year-end and assignment valuation-date observations, converts published yields to model rates, saves clean CSV files, and prints compact review tables.
 
-### Project Objectives
-
-The project aims to apply quantitative financial risk modelling techniques to Biocon Limited, including:
-
-- Black-Scholes-Merton (BSM) framework
-- Merton structural credit risk model
-- GARCH volatility modelling
-- Machine learning techniques for financial risk analysis
-- Model evaluation, interpretation and comparison
-
-The detailed implementation and evaluation methodology will follow the course assignment requirements.
-
-### Project Structure
+## Project structure
 
 ```text
 FRAM_BIOCON/
@@ -59,21 +42,35 @@ py -m venv .venv
 Activate it in Windows PowerShell:
 
 ```powershell
-.\.venv\Scripts\Activate.ps1
+python src/preprocess_market_inputs.py
 ```
 
-Install dependencies:
+The script reads:
 
-```powershell
-python -m pip install -r requirements.txt
-```
+- `data/raw/equity/Biocon_data.xlsx`
+- `data/raw/rates/Auctions of 91-Day Government of India Treasury Bills.xlsx`
+- `data/raw/rates/Auctions of 364-Day Government of India Treasury Bills.xlsx`
 
-### Project Status
+It creates:
 
-**Current phase:** Development environment and repository setup.
+- `data/processed/biocon_equity_adjusted.csv`
+- `data/processed/fiscal_year_end_equity_prices.csv`
+- `data/processed/valuation_date_equity_prices.csv`
+- `data/processed/rbi_tbill_auction_yields.csv`
+- `data/processed/valuation_date_tbill_rates.csv`
 
-Financial modelling and analysis are pending implementation.
+The terminal also displays fiscal-year-end equity prices, the 12 assignment valuation-date prices, and the matching 91-day and 364-day T-bill rates.
 
-### Academic Use
+## Modeling conventions
 
-Developed as part of a university course assignment. Results will be based on the specified financial data and modelling assumptions and should not be interpreted as investment recommendations.python -m pip install --upgrade pip
+- Preserve the user-supplied adjusted equity prices and returns.
+- Use the latest RBI auction yield available by each valuation cutoff.
+- Convert the published percentage yield with `R / 100`, then calculate the continuous rate as `ln(1 + R)`.
+- Use fiscal years ending 31 March for the Altman Z-score inputs.
+
+## Next steps
+
+- Preprocess NSE option contracts and document exclusions.
+- Collect dated shares outstanding and borrowings for Merton analysis.
+- Build GARCH, BSM, Merton, Altman Z-score, and ML notebooks.
+- Produce the final report and supporting outputs.
