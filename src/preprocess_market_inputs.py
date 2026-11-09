@@ -5,23 +5,23 @@ import matplotlib.dates as mdates
 import numpy as np
 import pandas as pd
 
+import input_data
+
 ROOT = Path(__file__).resolve().parents[1]
-RAW = ROOT / "data" / "raw"
 OUT = ROOT / "data" / "processed"
 FIGURE_OUT = ROOT / "outputs" / "figures"
 OUT.mkdir(parents=True, exist_ok=True)
 FIGURE_OUT.mkdir(parents=True, exist_ok=True)
 
-EQUITY_FILE = RAW / "equity" / "Biocon_data.xlsx"
-RATE_91_FILE = RAW / "rates" / "Auctions of 91-Day Government of India Treasury Bills.xlsx"
-RATE_364_FILE = RAW / "rates" / "Auctions of 364-Day Government of India Treasury Bills.xlsx"
-OPTIONS_FILE = RAW / "options" / "Biocon_options-_data.xlsx"
+MARKET_FILE = input_data.file(input_data.MARKET_FILE)
+RATE_91_FILE = input_data.file(input_data.RATE_91_FILE)
+RATE_364_FILE = input_data.file(input_data.RATE_364_FILE)
+OPTIONS_FILE = input_data.file(input_data.OPTIONS_FILE)
 
-# NSE ex-dividend dates verified for the assignment period.
-DIVIDEND_EVENTS = pd.DataFrame({
-    "ex_date": pd.to_datetime(["2025-07-04", "2026-07-03"]),
-    "dividend_per_share": [0.50, 0.50],
-})
+DIVIDEND_EVENTS = pd.read_excel(MARKET_FILE, sheet_name="Dividends").rename(
+    columns={"dividend_per_share_inr": "dividend_per_share"}
+)
+DIVIDEND_EVENTS["ex_date"] = pd.to_datetime(DIVIDEND_EVENTS["ex_date"])
 
 VALUATION_DATES = pd.to_datetime([
     "2025-10-31", "2025-11-28", "2025-12-31", "2026-01-30",
@@ -59,7 +59,7 @@ def latest_on_or_before(data, dates, columns):
 
 
 def load_equity():
-    data = pd.read_excel(EQUITY_FILE, sheet_name="Sheet1")
+    data = pd.read_excel(MARKET_FILE, sheet_name="Biocon")
     data.columns = data.columns.str.strip()
     data = data.rename(columns={
         "Symbol": "symbol",

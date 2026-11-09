@@ -1,12 +1,21 @@
 """Part A: own Newton-Raphson solver and assignment ATM interpolation."""
 from pathlib import Path
 from math import erf, exp, log, sqrt, pi, isfinite
+import warnings
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 
+# The assignment names py_vollib as a check-only reference implementation.
+with warnings.catch_warnings():
+    warnings.filterwarnings('ignore', message='py_vollib is deprecated.*')
+    from py_vollib.black_scholes_merton.implied_volatility import (
+        implied_volatility as py_vollib_iv,
+    )
+
 ROOT = Path(__file__).resolve().parents[1]
 TOL = 0.0001
+REFERENCE_IV_TOL = 0.00001
 
 
 def bsm(s, k, t, r, q, sigma, kind):
@@ -59,17 +68,26 @@ def solve_iv(s, k, t, r, q, price, kind):
     return np.nan, 'not_converged', n + 200, error
 
 
-def atm(group):
-    group = group.dropna(subset=['iv']).sort_values('moneyness_strike_to_spot')
+def reference_iv(s, k, t, r, q, price, kind):
+    """Return py_vollib IV for validation only; never use it as model input."""
+    flag = {'CE': 'c', 'PE': 'p'}[kind]
+    try:
+        return py_vollib_iv(price, s, k, t, r, q, flag)
+    except Exception:
+        return np.nan
+
+
+def atm(group, iv_column='iv'):
+    group = group.dropna(subset=[iv_column]).sort_values('moneyness_strike_to_spot')
     x = group.moneyness_strike_to_spot
     exact = group.loc[x.eq(1)]
     if len(exact):
-        return float(exact.iv.iloc[0])
+        return float(exact[iv_column].iloc[0])
     below, above = group.loc[x < 1], group.loc[x > 1]
     if below.empty or above.empty:
         return np.nan  # Never extrapolate a missing side.
     a, b = below.iloc[-1], above.iloc[0]
-    return a.iv + (b.iv - a.iv) * (1 - a.moneyness_strike_to_spot) / (b.moneyness_strike_to_spot - a.moneyness_strike_to_spot)
+    return a[iv_column] + (b[iv_column] - a[iv_column]) * (1 - a.moneyness_strike_to_spot) / (b.moneyness_strike_to_spot - a.moneyness_strike_to_spot)
 
 
 def main():
@@ -78,12 +96,29 @@ def main():
                         row.risk_free_rate, row.dividend_yield, row.market_price,
                         row.option_type) for row in data.itertuples()]
     data[['iv', 'solver_status', 'iterations', 'price_error']] = pd.DataFrame(results, index=data.index)
+    data['py_vollib_iv_check'] = [
+        reference_iv(
+            row.spot_price, row.strike_price, row.time_to_expiry_years,
+            row.risk_free_rate, row.dividend_yield, row.market_price,
+            row.option_type,
+        )
+        for row in data.itertuples()
+    ]
+    data['iv_check_difference'] = data.iv - data.py_vollib_iv_check
+    data['iv_check_passed'] = data.iv_check_difference.abs() <= REFERENCE_IV_TOL
     records = []
     for date, group in data.groupby('valuation_date'):
         call, put = [atm(group.loc[group.option_type.eq(kind)]) for kind in ['CE', 'PE']]
+        reference_call, reference_put = [
+            atm(group.loc[group.option_type.eq(kind)], 'py_vollib_iv_check')
+            for kind in ['CE', 'PE']
+        ]
         records.append({'valuation_date': date, 'call_atm_iv': call, 'put_atm_iv': put,
                         'atm_iv': (call + put) / 2, 'contracts': len(group),
-                        'failed_solutions': int(group.iv.isna().sum())})
+                        'failed_solutions': int(group.iv.isna().sum()),
+                        'py_vollib_call_atm_iv': reference_call,
+                        'py_vollib_put_atm_iv': reference_put,
+                        'py_vollib_atm_iv': (reference_call + reference_put) / 2})
     summary = pd.DataFrame(records)
     parity = data.pivot_table(
         index=['valuation_date', 'expiry_date', 'strike_price', 'spot_price',
@@ -100,6 +135,9 @@ def main():
         max_abs_parity_error=('parity_error', lambda x: x.abs().max()),
     )
     summary['atm_call_put_gap'] = (summary.call_atm_iv - summary.put_atm_iv).abs()
+    summary['atm_iv_check_difference'] = (
+        summary.atm_iv - summary.py_vollib_atm_iv
+    )
     summary['contracts_volume_below_10'] = summary.valuation_date.map(
         data.loc[data.traded_volume < 10].groupby('valuation_date').size()
     ).fillna(0).astype(int)
@@ -111,14 +149,26 @@ def main():
     assert not data.duplicated(['valuation_date', 'instrument_id']).any(), 'Duplicate contracts found'
     assert data.iv.notna().all(), 'One or more IV solutions failed'
     assert data.price_error.abs().max() < TOL, 'Repricing tolerance failed'
+    assert data.py_vollib_iv_check.notna().all(), 'One or more py_vollib checks failed'
+    assert data.iv_check_passed.all(), 'Own IV differs unexpectedly from py_vollib'
     assert summary[['call_atm_iv', 'put_atm_iv', 'atm_iv']].notna().all().all(), 'Missing ATM bracket'
+    assert summary.atm_iv_check_difference.abs().max() <= REFERENCE_IV_TOL, 'ATM IV check failed'
     out = ROOT / 'data/processed'
     data.to_csv(out / 'option_implied_volatility.csv', index=False)
+    validation_columns = [
+        'valuation_date', 'instrument_id', 'option_type', 'expiry_date',
+        'strike_price', 'spot_price', 'market_price', 'iv',
+        'py_vollib_iv_check', 'iv_check_difference', 'iv_check_passed',
+    ]
+    data[validation_columns].to_csv(out / 'iv_solver_validation.csv', index=False)
     summary.to_csv(out / 'atm_implied_volatility.csv', index=False)
     parity.to_csv(out / 'option_put_call_parity_diagnostics.csv', index=False)
     print(summary.to_string(index=False))
     print('Solver status:', data.solver_status.value_counts().to_dict())
     print('Maximum absolute repricing error:', data.price_error.abs().max())
+    print('Maximum absolute IV difference vs py_vollib:',
+          data.iv_check_difference.abs().max())
+    print('py_vollib validation:', f'{int(data.iv_check_passed.sum())}/{len(data)} passed')
     print('\nDates requiring ATM data-quality review')
     print(summary.loc[summary.atm_gap_over_10pp, [
         'valuation_date', 'call_atm_iv', 'put_atm_iv', 'atm_call_put_gap',
@@ -157,71 +207,12 @@ def main():
     ax.scatter([1, 1], [sep.call_atm_iv * 100, sep.put_atm_iv * 100],
                marker='X', s=90, color=['#1f77b4', '#ff7f0e'], zorder=4)
     ax.axvline(1, color='#64748b', linewidth=.8, linestyle='--')
-    ax.set(xlabel='Moneyness K/S', ylabel='Annualised IV (%)', title='Biocon IV smile — 30 September 2026')
+    ax.set(xlabel='Moneyness K/S', ylabel='Annualised IV (%)', title='Biocon IV smile_30 September 2026')
     ax.grid(axis='y', alpha=.25)
     ax.legend()
     fig.text(.01, .01, 'Settlement prices. Marker size reflects volume; curves are liquidity-weighted quadratic fits.', fontsize=9, color='#475569')
     fig.tight_layout()
     fig.savefig(figures / 'iv_smile_2026_09_30.png', dpi=180)
-
-    # Separate presentation-only combined smile. At matched strikes, average
-    # call and put IVs before fitting one liquidity-weighted quadratic curve.
-    september = data.loc[data.valuation_date.eq('2026-09-30')].copy()
-    combined = september.pivot_table(
-        index='moneyness_strike_to_spot',
-        columns='option_type',
-        values=['iv', 'traded_volume'],
-        aggfunc='first',
-    ).dropna().reset_index()
-    combined['combined_iv'] = (combined[('iv', 'CE')] + combined[('iv', 'PE')]) / 2
-    combined['combined_volume'] = (
-        combined[('traded_volume', 'CE')] + combined[('traded_volume', 'PE')]
-    )
-    combined_x = combined['moneyness_strike_to_spot'].to_numpy()
-    combined_y = combined['combined_iv'].to_numpy() * 100
-    combined_weights = np.sqrt(combined['combined_volume'].to_numpy())
-    combined_coefficients = np.polyfit(
-        combined_x, combined_y, 2, w=combined_weights
-    )
-    combined_curve_x = np.linspace(combined_x.min(), combined_x.max(), 200)
-
-    fig, ax = plt.subplots(figsize=(10, 5.5))
-    ax.scatter(
-        combined_x,
-        combined_y,
-        s=40 + 16 * np.log1p(combined['combined_volume']),
-        color='#7c3aed',
-        alpha=.68,
-        edgecolor='white',
-        linewidth=.7,
-        label='Matched-strike call/put averages',
-    )
-    ax.plot(
-        combined_curve_x,
-        np.polyval(combined_coefficients, combined_curve_x),
-        color='#6d28d9',
-        linewidth=2.4,
-        label='Hypothetical combined curve',
-    )
-    ax.scatter(
-        [1], [sep.atm_iv * 100], marker='X', s=110,
-        color='#111827', zorder=4, label='Assignment ATM IV',
-    )
-    ax.axvline(1, color='#64748b', linewidth=.8, linestyle='--')
-    ax.set(
-        xlabel='Moneyness K/S',
-        ylabel='Annualised IV (%)',
-        title='Biocon hypothetical combined IV smile — 30 September 2026',
-    )
-    ax.grid(axis='y', alpha=.25)
-    ax.legend()
-    fig.text(
-        .01, .01,
-        'Presentation proxy: matched-strike call and put IVs are averaged, then a liquidity-weighted quadratic is fitted. Not used in ATM IV or Merton.',
-        fontsize=8.5, color='#475569',
-    )
-    fig.tight_layout(rect=[0, .035, 1, 1])
-    fig.savefig(figures / 'iv_smile_combined_hypothetical_2026_09_30.png', dpi=180)
 
     fig, ax = plt.subplots(figsize=(10, 5))
     ax.plot(pd.to_datetime(summary.valuation_date), summary.atm_iv * 100, 'o-')
@@ -229,6 +220,30 @@ def main():
     fig.autofmt_xdate()
     fig.tight_layout()
     fig.savefig(figures / 'atm_iv_monthly.png', dpi=180)
+
+    # Compare the assignment IV and the repository check on one simple chart.
+    comparison_dates = pd.to_datetime(summary.valuation_date)
+    fig, ax = plt.subplots(figsize=(10, 5.5))
+    ax.plot(
+        comparison_dates, summary.py_vollib_atm_iv * 100,
+        's--', color='#f59e0b', linewidth=2.2, markersize=6,
+        label='py_vollib ATM IV (check only)',
+    )
+    ax.plot(
+        comparison_dates, summary.atm_iv * 100,
+        'o-', color='#2563eb', linewidth=1.7, markersize=4,
+        label='Own Newton-Raphson ATM IV',
+    )
+    ax.set(
+        xlabel='Valuation date',
+        ylabel='Annualised ATM IV (%)',
+        title='Biocon ATM IV validation: own solver vs py_vollib',
+    )
+    ax.grid(axis='y', alpha=.25)
+    ax.legend()
+    fig.autofmt_xdate()
+    fig.tight_layout()
+    fig.savefig(figures / 'atm_iv_own_vs_py_vollib.png', dpi=180)
     plt.show()
 
 
