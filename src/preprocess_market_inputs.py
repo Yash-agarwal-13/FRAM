@@ -108,6 +108,10 @@ def load_equity():
 
 def load_rate(file, maturity):
     raw = pd.read_excel(file, header=None)
+    header_ok = raw.iloc[:10, 13].astype(str).str.contains(
+        "Implicit Yield", case=False, regex=False
+    ).any()
+    assert header_ok, "RBI implicit-yield column layout changed"
     rates = raw.iloc[:, [1, 13]].copy()
     rates.columns = ["date", "yield_percent"]
     rates["date"] = pd.to_datetime(rates["date"], format="mixed", errors="coerce")

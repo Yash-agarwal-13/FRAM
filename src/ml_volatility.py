@@ -1,5 +1,6 @@
 """Part B: Random Forest volatility forecasts and Merton DD/PD."""
 from pathlib import Path
+import hashlib
 import warnings
 
 import matplotlib.pyplot as plt
@@ -8,7 +9,12 @@ import pandas as pd
 from arch import arch_model
 from sklearn.ensemble import RandomForestRegressor
 
-import merton_model
+try:
+    import merton_model
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Run the Part A Merton structural-model calculation first."
+    ) from exc
 import input_data
 
 
@@ -29,10 +35,16 @@ WINDOW, MIN_GARCH = 1000, 252
 def daily_garch(history):
     """Create known-at-date GARCH features and 21/252-day benchmarks."""
     cache = ROOT / 'data/processed/ml_daily_garch_features.csv'
+    signature_file = cache.with_suffix('.sha256')
     expected = len(history) - MIN_GARCH + 1
-    if cache.exists():
+    signature = hashlib.sha256(
+        history.model_return.to_numpy(dtype=float).tobytes()
+    ).hexdigest()
+    if cache.exists() and signature_file.exists():
         saved = pd.read_csv(cache, parse_dates=['date'])
-        if (len(saved) == expected and saved.date.iloc[-1] == history.date.iloc[-1]):
+        signature_matches = signature_file.read_text(encoding='utf-8').strip() == signature
+        if (signature_matches and len(saved) == expected
+                and saved.date.iloc[-1] == history.date.iloc[-1]):
             return saved
 
     rows = []
@@ -60,6 +72,7 @@ def daily_garch(history):
 
     result = pd.DataFrame(rows)
     result.to_csv(cache, index=False)
+    signature_file.write_text(signature, encoding='utf-8')
     return result
 
 
