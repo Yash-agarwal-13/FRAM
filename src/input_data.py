@@ -26,6 +26,11 @@ def file(name):
         candidate = folder / name
         if candidate.exists():
             return candidate
+    colab = Path('/content')
+    if colab.exists():
+        matches = list(colab.rglob(name))
+        if matches:
+            return min(matches, key=lambda path: (len(path.parts), str(path)))
     raise FileNotFoundError(f'Missing input file: {name}')
 
 

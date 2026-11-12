@@ -7,7 +7,12 @@ import pandas as pd
 from scipy.optimize import fsolve, least_squares
 from scipy.stats import norm
 
-import merton_model
+try:
+    import merton_model
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Run the Part A Merton structural-model calculation first."
+    ) from exc
 import input_data
 
 

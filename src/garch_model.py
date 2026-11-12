@@ -8,7 +8,12 @@ import pandas as pd
 from arch import arch_model
 from statsmodels.stats.diagnostic import acorr_ljungbox, het_arch
 
-import merton_model
+try:
+    import merton_model
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Run the Part A Merton structural-model calculation first."
+    ) from exc
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -170,6 +175,13 @@ def main():
                'half_life_days', 'normal_sigma_e', 'student_t_sigma_e']
     print('\nGARCH VOLATILITY FORECASTS')
     print(forecasts[columns].to_string(index=False))
+    parameter_columns = [
+        'valuation_date', 'omega', 'omega_se', 'alpha', 'alpha_se',
+        'beta', 'beta_se', 'nu', 'nu_se', 'persistence',
+    ]
+    student_parameters = models.query("distribution == 't'")[parameter_columns]
+    print('\nSTUDENT_T GARCH PARAMETERS AND STANDARD ERRORS')
+    print(student_parameters.to_string(index=False))
     print(f"\nStudent-t BIC wins: {forecasts.student_t_bic_better.sum()}/12")
     print('Maximum volatility check difference:',
           models.sigma_e_check_difference.abs().max())

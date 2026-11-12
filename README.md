@@ -6,6 +6,8 @@ Financial Risk Analytics and Management project for Biocon Limited. The project 
 
 Market preprocessing and Parts A-E are implemented, including implied volatility, Merton calibration, GARCH, Random Forest, rating-implied PD, Altman accounting scores and the final route comparison. The code preserves valuation-date cutoffs, exports audit tables, and rebuilds the figures from five consolidated input workbooks.
 
+The self-contained Google Colab submission is `final/FRAM_Biocon_Final.ipynb`. It embeds the audited modules, requests only the five consolidated workbooks, includes the model theory and interpretation, and runs the complete workflow in assignment order.
+
 ## Project structure
 
 ```text

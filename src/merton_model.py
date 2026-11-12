@@ -21,6 +21,10 @@ PUBLICATION_DATES = pd.to_datetime([
     '2025-08-07', '2025-11-11', '2026-02-12',
     '2026-05-07', '2026-08-05',
 ])
+EXPECTED_BALANCE_DATES = pd.to_datetime([
+    '2025-06-30', '2025-09-30', '2025-12-31',
+    '2026-03-31', '2026-06-30',
+])
 
 
 def debt_schedule():
@@ -28,9 +32,8 @@ def debt_schedule():
         FINANCIAL_FILE, sheet_name='Quarterly balance sheet ', header=None
     )
     headers = raw.iloc[2, 1:6].astype(str)
-    borrowings = raw.loc[
-        raw.iloc[:, 0].astype(str).str.strip().eq('Borrowings'), 1:5
-    ].apply(pd.to_numeric)
+    mask = raw.iloc[:, 0].astype(str).str.strip().eq('Borrowings')
+    borrowings = raw.loc[mask, raw.columns[1:6]].apply(pd.to_numeric)
     assert borrowings.shape == (2, 5)
     reports = headers.str.split('\n').str[0].to_list()
     balance_dates = pd.to_datetime(
@@ -46,6 +49,10 @@ def debt_schedule():
     debt['debt'] = (
         debt.current_borrowings + 0.5 * debt.non_current_borrowings
     )
+    assert debt.balance_sheet_date.tolist() == EXPECTED_BALANCE_DATES.tolist(), (
+        'Balance-sheet dates or order changed; update PUBLICATION_DATES.'
+    )
+    assert len(PUBLICATION_DATES) == len(debt)
     return debt
 
 

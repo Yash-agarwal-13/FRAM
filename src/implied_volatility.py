@@ -36,11 +36,13 @@ def solve_iv(s, k, t, r, q, price, kind):
     if not all(isfinite(x) for x in [s, k, t, r, q, price]) or min(s, k, t, price) <= 0:
         return np.nan, 'invalid_input', 0, np.nan
     sigma = 0.3
-    for n in range(1, 101):
+    iterations = 0
+    for _ in range(100):
+        iterations += 1
         fitted, vega = bsm(s, k, t, r, q, sigma, kind)
         error = fitted - price
         if abs(error) < TOL:
-            return sigma, 'newton', n, error
+            return sigma, 'newton', iterations, error
         if vega < 1e-10:
             break
         candidate = sigma - error / vega
@@ -53,19 +55,20 @@ def solve_iv(s, k, t, r, q, price, kind):
     fhi = bsm(s, k, t, r, q, hi, kind)[0] - price
     for edge, error in [(lo, flo), (hi, fhi)]:
         if abs(error) < TOL:
-            return edge, 'bisection', n, error
+            return edge, 'bisection', iterations, error
     if flo * fhi > 0:
-        return np.nan, 'no_solution_in_bracket', n, np.nan
-    for j in range(1, 201):
+        return np.nan, 'no_solution_in_bracket', iterations, np.nan
+    for _ in range(200):
+        iterations += 1
         sigma = (lo + hi) / 2
         error = bsm(s, k, t, r, q, sigma, kind)[0] - price
         if abs(error) < TOL:
-            return sigma, 'bisection', n + j, error
+            return sigma, 'bisection', iterations, error
         if error > 0:
             hi = sigma
         else:
             lo = sigma
-    return np.nan, 'not_converged', n + 200, error
+    return np.nan, 'not_converged', iterations, error
 
 
 def reference_iv(s, k, t, r, q, price, kind):

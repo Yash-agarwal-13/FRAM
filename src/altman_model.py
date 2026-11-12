@@ -7,8 +7,18 @@ import numpy as np
 import pandas as pd
 from scipy.stats import norm
 
-import merton_model
-import rating_model
+try:
+    import merton_model
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Run the Part A Merton structural-model calculation first."
+    ) from exc
+try:
+    import rating_model
+except ModuleNotFoundError as exc:
+    raise RuntimeError(
+        "Run the Part C rating calculation first."
+    ) from exc
 import input_data
 
 
@@ -137,7 +147,14 @@ def reverse_engineer(scores):
         FINANCIAL_FILE, sheet_name='Rating Data', header=7, nrows=3,
         usecols='A:C',
     ).set_index('rating_category')
-    category = final.em_rating_equivalent.rstrip('+-')
+    collected = {'AAA': 'AAA', 'AA': 'AA', 'A': 'A'}
+    base_category = final.em_rating_equivalent.rstrip('+-')
+    if base_category not in collected:
+        raise ValueError(
+            f'EM rating {final.em_rating_equivalent} has no default rate in '
+            'Rating Data; add the missing category before recalculating.'
+        )
+    category = collected[base_category]
     if category not in rating_source.index:
         raise ValueError(f'CRISIL default rate not collected for {category}')
     raw_pd = rating_source.loc[category, 'one_year_default_rate']
