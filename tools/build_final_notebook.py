@@ -76,7 +76,8 @@ The notebook uses five files already placed in Colab's **Files** panel:
 - Consolidated statements are used and financial values are in INR million.
 - RBI yields are selected without using a future auction and converted as $r=\ln(1+R/100)$.
 - Merton uses $T=1$, $E=\text{price}\times\text{shares}$ and $D=\text{short-term debt}+0.5\times\text{long-term debt}$.
-- Risk-neutral PD is the main result; physical PD is a robustness result.
+- Risk-neutral PD, obtained with $\mu=r$, is the primary cross-route result. Wherever the assignment invokes the Merton or inverse-Merton system, the physical specification using the annualised historical mean adjusted return is also calculated and reported.
+- CRISIL and Altman supply empirical PD inputs. They are not themselves risk-neutral probabilities; only the associated inverse-Merton calibration is labelled risk-neutral or physical according to the drift used.
 - The minimum reported PD is 0.03%, equal to 3 basis points.
 """),
 md(r"""
@@ -195,7 +196,7 @@ Here $d_1=[\ln(V/D)+(r+\tfrac12\sigma_V^2)T]/(\sigma_V\sqrt{T})$ and $d_2=d_1-\s
 
 $$DD=\frac{\ln(V/D)+(\mu-\tfrac12\sigma_V^2)T}{\sigma_V\sqrt{T}},\qquad PD=N(-DD).$$
 
-The risk-neutral specification sets $\mu=r$ and is the primary result. The physical specification replaces $r$ with the annualised historical mean adjusted log return. Solver convergence is verified by substituting $(V,\sigma_V)$ back into both equations, and DD/PD is independently checked with the assignment-listed Merton package. The cell reports all 12 valuation dates and the equity-volatility sensitivity analysis.
+The risk-neutral specification sets $\mu=r$ and is the primary result. The physical specification replaces $r$ with the annualised historical mean adjusted log return. Both DD and PD series are reported for all 12 dates. Solver convergence is verified by substituting $(V,\sigma_V)$ back into both equations, and DD/PD is independently checked with the assignment-listed Merton package. The cell also reports the equity-volatility sensitivity analysis required for 30 September 2026.
 """),
 model_cell('merton_model.py', register='merton_model'),
 md(r"""**Part A interpretation.** On 30 September 2026, $\sigma_E=24.915\%$, $\sigma_V=21.653\%$ and risk-neutral $DD=9.281$. The corresponding raw normal-tail PD is below the assignment threshold and is therefore reported at the mandatory 3 bp floor. The high DD is driven by the estimated asset value relative to the KMV default point; it is not evidence that Biocon has no borrowings."""),
@@ -208,7 +209,7 @@ Daily returns are $u_t=\ln(S_t/S_{t-1})$. Normal and Student_t conditional likel
 
 $$\bar\sigma^2(T)=V_L+\frac{1-e^{-aT}}{aT}[V(0)-V_L],\qquad \sigma_E^{GARCH}=\sqrt{252\bar\sigma^2(T)}.$$
 
-The calculation below compares both distributions, selects Student_t by BIC, prints forecasts and diagnostics, and displays the GARCH volatility and DD figures once.
+The calculation below compares both distributions, selects Student_t by BIC, reports parameters with standard errors and every required diagnostic for all 12 dates, and displays the GARCH volatility and DD figures once. Merton results are shown under both risk-neutral and physical drift.
 """),
 model_cell('garch_model.py'),
 md(r"""
@@ -220,10 +221,10 @@ $$RV_{t,h}=\sqrt{\frac{252}{h}\sum_{i=1}^{h}u_{t+i}^2}.$$
 
 The dependent variable is $\log(RV_{t,h})$. Features known at $t$ are realised volatility over 5, 21 and 63 days; returns over 1, 5 and 21 days; filtered GARCH volatility; India VIX; Nifty 50 21-day return; and a results-month indicator. Observations are split chronologically into 60% training, 20% validation and 20% test samples. Any forward target whose horizon crosses a split boundary is purged to prevent label leakage. Hyperparameters are selected only on validation QLIKE, after which the untouched test set is evaluated using RMSE, MAE, QLIKE and $R^2_{OOS}=1-MSE_{RF}/MSE_{GARCH}$. The 252-day forecast enters Merton because it matches the one-year structural horizon.
 
-The cell prints test accuracy and monthly forecasts, then displays feature importance and the ML-versus-GARCH figures once.
+The cell prints test accuracy and monthly forecasts, then displays feature importance and the ML-versus-GARCH figures once. It also creates the assignment-required 30 September 2026 Part B table, placing GARCH and Random Forest $\sigma_E$, $\sigma_V$, risk-neutral DD/PD and physical DD/PD side by side.
 """),
 model_cell('ml_volatility.py'),
-md(r"""**Part B interpretation.** At the main date, Student_t GARCH gives $\sigma_E=32.690\%$ and $DD=7.014$, while Random Forest gives $\sigma_E=31.480\%$ and $DD=7.295$. Both raw structural PDs remain below the 3 bp reporting floor. The 252-day Random Forest has negative GARCH-relative out-of-sample $R^2$, so the ML specification does not improve on the volatility benchmark and is retained as a separate required route rather than claimed as the preferred forecast."""),
+md(r"""**Part B interpretation.** At the main date, Student_t GARCH gives $\sigma_E=32.690\%$ and risk-neutral $DD=7.014$, while Random Forest gives $\sigma_E=31.480\%$ and risk-neutral $DD=7.295$. The corresponding physical DD and PD estimates appear in the dedicated comparison table above. Both raw structural PDs remain below the 3 bp reporting floor. The 252-day Random Forest has negative GARCH-relative out-of-sample $R^2$, so the ML specification does not improve on the volatility benchmark and is retained as a separate required route rather than claimed as the preferred forecast."""),
 md(r"""
 ## Part C: Rating-implied PD
 
@@ -231,7 +232,7 @@ Biocon's CRISIL AA+ Stable rating maps to AA. Published one-year default rates a
 
 $$\sqrt{3\times7}=4.5826\text{ bp}.$$
 
-Adjacent-category bucket edges are constructed geometrically after applying the reporting floor. Each target is converted using $DD=-N^{-1}(PD)$. Holding 30 September 2026 equity value, default point, risk-free rate and horizon fixed, the Merton equity-pricing equation and target-DD equation are solved jointly for $(V,\sigma_V)$. The corresponding $\sigma_E$ follows from the Merton volatility identity. This is an inverse calibration: rating PD is the input and volatility is the implied output.
+Adjacent-category bucket edges are constructed geometrically after applying the reporting floor. Each target is converted using $DD=-N^{-1}(PD)$. The CRISIL category PD is an empirical through-the-cycle input, not a risk-neutral market probability. Holding 30 September 2026 equity value, default point, rate and horizon fixed, the Merton equity-pricing equation and target-DD equation are solved jointly for $(V,\sigma_V)$. The corresponding $\sigma_E$ follows from the Merton volatility identity. The calculation is repeated with $\mu=r$ and with the historical physical drift; these labels describe the inverse calibration, not the original CRISIL PD.
 """),
 model_cell('rating_model.py', register='rating_model'),
 md("""**Part C interpretation.** The risk-neutral CRISIL-consistent equity-volatility interval is 63.124% to 65.024%, materially above both ATM IV and GARCH. The difference is economically interpretable because structural market estimates respond to the current equity and option state, whereas the rating default study is a historical, through-the-cycle calibration supplemented by qualitative credit assessment."""),
@@ -242,7 +243,7 @@ $$Z=1.2X_1+1.4X_2+3.3X_3+0.6X_4+X_5,$$
 
 $$Z''=6.56X_1+3.26X_2+6.72X_3+1.05X_4,\qquad EM=Z''+3.25.$$
 
-$X_1$ measures short-term liquidity through working capital/total assets. $X_2$ measures cumulative profitability through Other equity/total assets under the assignment's reserves-and-surplus instruction. $X_3$ is operating profitability, with EBIT defined consistently as PBT plus finance cost. $X_4$ measures solvency using market equity/total liabilities for original Z and book equity/total liabilities for $Z''$. $X_5$ is asset turnover, sales/total assets. EM is the preferred accounting specification because Biocon is an emerging-market issuer. The unrounded FY2026 EM score is mapped to Altman's bond-rating interval, then to the corresponding CRISIL one-year category PD, and finally reverse-calibrated through Merton.
+$X_1$ measures short-term liquidity through working capital/total assets. $X_2$ measures cumulative profitability through Other equity/total assets under the assignment's reserves-and-surplus instruction. $X_3$ is operating profitability, with EBIT defined consistently as PBT plus finance cost. $X_4$ measures solvency using market equity/total liabilities for original Z and book equity/total liabilities for $Z''$. $X_5$ is asset turnover, sales/total assets. EM is the preferred accounting specification because Biocon is an emerging-market issuer. The unrounded FY2026 EM score is mapped to Altman's bond-rating interval and then to the corresponding empirical CRISIL category PD. The implied volatilities are reverse-calibrated under both risk-neutral and physical drift; the empirical PD input itself is not reclassified as risk-neutral.
 
 The cell prints FY2022 to FY2026 scores and the reverse-solved result, then displays the three separate score graphs once.
 """),
@@ -251,7 +252,7 @@ md("""**Part D interpretation.** FY2026 original $Z=2.428$ lies in the grey zone
 md(r"""
 ## Part E: Comparison
 
-The assignment requires a common comparison of $\sigma_E$, $\sigma_V$, DD and PD. Structural market routes estimate PD from observed or forecast volatility and are point-in-time. The CRISIL route starts from a through-the-cycle category PD. The Altman route starts from an accounting score and category mapping. For CRISIL and Altman, volatility is reverse-engineered to make the Merton system consistent with the externally calibrated PD.
+The assignment requires a common comparison of $\sigma_E$, $\sigma_V$, DD and PD. Structural market routes estimate PD from observed or forecast volatility and are point-in-time. The CRISIL route starts from an empirical through-the-cycle category PD. The Altman route starts from an accounting score mapped to an empirical rating-category PD. For CRISIL and Altman, volatility is reverse-engineered to make the Merton system consistent with the external PD. The headline Part E table uses the assignment's risk-neutral calibration for comparability; detailed Part A to D outputs retain the corresponding physical results.
 
 The calculation prints the completed table and displays separate volatility and PD comparison figures once.
 """),

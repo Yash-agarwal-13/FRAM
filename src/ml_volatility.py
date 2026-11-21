@@ -317,6 +317,72 @@ def figures(forecasts, importance, ml_merton):
     plt.show()
 
 
+def part_b_main_date_table(ml_merton):
+    """Compare the two required Part B routes on 30 September 2026."""
+    target = pd.Timestamp('2026-09-30')
+    garch = pd.read_csv(
+        ROOT / 'data/processed/garch_merton_results.csv',
+        parse_dates=['valuation_date'],
+    )
+    garch = garch.loc[garch.valuation_date.eq(target)]
+    ml = ml_merton.loc[ml_merton.valuation_date.eq(target)]
+    assert len(garch) == 1 and len(ml) == 1
+
+    rows = []
+    for route, frame in [
+        ('Student_t GARCH', garch),
+        ('Random Forest', ml),
+    ]:
+        row = frame.iloc[0]
+        rows.append({
+            'route': route,
+            'sigma_e': row.sigma_e,
+            'sigma_v': row.sigma_v,
+            'dd_risk_neutral': row.dd_risk_neutral,
+            'pd_risk_neutral_bp': row.pd_risk_neutral_bp,
+            'dd_physical': row.dd_physical,
+            'pd_physical_bp': row.pd_physical_bp,
+        })
+    return pd.DataFrame(rows)
+
+
+def display_part_b_table(comparison):
+    """Show a compact professional table in notebooks with a terminal fallback."""
+    labels = {
+        'route': 'Route',
+        'sigma_e': 'sigma_E',
+        'sigma_v': 'sigma_V',
+        'dd_risk_neutral': 'RN DD',
+        'pd_risk_neutral_bp': 'RN PD',
+        'dd_physical': 'Physical DD',
+        'pd_physical_bp': 'Physical PD',
+    }
+    view = comparison.rename(columns=labels)
+    try:
+        from IPython import get_ipython
+        from IPython.display import display
+        if get_ipython() is not None:
+            display(view.style.hide(axis='index').format({
+                'sigma_E': '{:.3%}',
+                'sigma_V': '{:.3%}',
+                'RN DD': '{:.4f}',
+                'RN PD': '{:.2f} bp',
+                'Physical DD': '{:.4f}',
+                'Physical PD': '{:.2f} bp',
+            }).set_caption('Part B comparison: 30 September 2026'))
+            return
+    except ImportError:
+        pass
+    print(view.to_string(index=False, formatters={
+        'sigma_E': '{:.3%}'.format,
+        'sigma_V': '{:.3%}'.format,
+        'RN DD': '{:.4f}'.format,
+        'RN PD': '{:.2f} bp'.format,
+        'Physical DD': '{:.4f}'.format,
+        'Physical PD': '{:.2f} bp'.format,
+    }))
+
+
 def main():
     panel = build_panel()
     all_forecasts, all_accuracy, all_tuning, importances = [], [], [], {}
@@ -360,6 +426,8 @@ def main():
     forecasts.to_csv(out / 'ml_volatility_forecasts.csv', index=False)
     importance.to_csv(out / 'ml_feature_importance.csv', index=False)
     ml_merton.to_csv(out / 'ml_merton_results.csv', index=False)
+    comparison = part_b_main_date_table(ml_merton)
+    comparison.to_csv(out / 'part_b_main_date_comparison.csv', index=False)
 
     print('\nOUT-OF-SAMPLE ACCURACY')
     print(accuracy[['horizon_days', 'model', 'test_rows', 'rmse', 'mae',
@@ -373,6 +441,8 @@ def main():
         'sigma_e', 'sigma_v', 'dd_risk_neutral', 'pd_risk_neutral_bp',
         'dd_physical', 'pd_physical_bp',
     ]].to_string())
+    print('\n30 SEPTEMBER 2026 - PART B COMPARISON')
+    display_part_b_table(comparison)
     figures(forecasts, importances[252], ml_merton)
 
 
