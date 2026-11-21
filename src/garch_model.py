@@ -187,6 +187,15 @@ def main():
           models.sigma_e_check_difference.abs().max())
 
     selected = models.query("distribution == 't'")
+    diagnostic_columns = [
+        'valuation_date', 'persistence', 'long_run_daily_variance',
+        'half_life_days', 'log_likelihood', 'aic', 'bic',
+        'arch_lm_pvalue_10', 'ljung_box_resid_pvalue_10',
+        'ljung_box_resid_pvalue_20', 'ljung_box_squared_pvalue_10',
+        'ljung_box_squared_pvalue_20', 'garch_sigma_e',
+    ]
+    print('\nSTUDENT_T GARCH DIAGNOSTICS AND ANNUALISED VOLATILITY')
+    print(selected[diagnostic_columns].to_string(index=False))
     print('Diagnostics below 5%: '
           f"ARCH-LM {(selected.arch_lm_pvalue_10 < .05).sum()}/12; "
           f"residual LB10 {(selected.ljung_box_resid_pvalue_10 < .05).sum()}/12; "
